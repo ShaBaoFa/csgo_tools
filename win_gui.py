@@ -131,12 +131,12 @@ class Ui_task_MainWindow(object):
         # 为每一列设置特定的列宽
         self.accTable.setColumnWidth(0, 30)  # 为第一列设置100像素宽
         self.accTable.setColumnWidth(1, 85)  # 为第二列设置150像素宽
-        self.accTable.setColumnWidth(2, 20)  # 为第三列设置150像素宽
-        self.accTable.setColumnWidth(3, 20)  # 以此类推...
-        self.accTable.setColumnWidth(4, 20)
-        self.accTable.setColumnWidth(5, 85)
-        self.accTable.setColumnWidth(6, 100)
-        self.accTable.setColumnWidth(7, 70)
+        self.accTable.setColumnWidth(2, 0)  # 为第三列设置150像素宽
+        self.accTable.setColumnWidth(3, 0)  # 以此类推...
+        self.accTable.setColumnWidth(4, 0)
+        self.accTable.setColumnWidth(5, 0)
+        self.accTable.setColumnWidth(6, 50)
+        self.accTable.setColumnWidth(7, 0)
         self.accTable.setColumnWidth(8, 200)
         self.accTable.setColumnWidth(9, 70)
         self.accTable.setColumnWidth(10, 70)

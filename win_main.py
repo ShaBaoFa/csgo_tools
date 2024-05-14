@@ -157,9 +157,9 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
                     checkBoxItem = QtWidgets.QTableWidgetItem()
                     checkBoxItem.setCheckState(QtCore.Qt.Unchecked)
                     self.accTable.setItem(rowIndex, 0, checkBoxItem)
-                    items = line.strip().split('----')
+                    items = line.strip().split(':')
                     for columnIndex, item in enumerate(items):
-                        if columnIndex < self.accTable.columnCount() and columnIndex < 4:
+                        if columnIndex < self.accTable.columnCount() and columnIndex < 2:
                             self.accTable.setItem(rowIndex, columnIndex + 1, QtWidgets.QTableWidgetItem(item))
 
     def toggle_task(self):
@@ -184,8 +184,10 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             for rowIndex in range(rowCount):
                 account = self.accTable.item(rowIndex, 1).text()
                 password = self.accTable.item(rowIndex, 2).text()
-                email = self.accTable.item(rowIndex, 3).text()
-                email_pwd = self.accTable.item(rowIndex, 4).text()
+                email = ''
+                # email = self.accTable.item(rowIndex, 3).text()
+                email_pwd = ''
+                # email_pwd = self.accTable.item(rowIndex, 4).text()
                 # 将任务参数作为元组加入队列
                 self.taskQueue.put((account, password, email, email_pwd, rowIndex))
 
