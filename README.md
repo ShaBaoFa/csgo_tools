@@ -1,14 +1,10 @@
 #  csgo查询工具
 
+![Static Badge](https://img.shields.io/badge/v3.10.*-blue?style=flat&logo=python&logoColor=white&labelColor=gray)
+
 在
 https://github.com/Cra2yQi/steam-check-recently-dropped
 的基础上进行了修改，增加了检查个人信息、VAC状态的功能。
-
-## python版本
-
-```bash
-    python 3.10.*
-```
 
 ## install
 
