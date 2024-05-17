@@ -196,6 +196,8 @@ class Worker(QThread, QObject):
             inventory_list = regex_recently_dropped(inventory_re)
             if inventory_list:
                 if inventory_list[0]['date'] == inventory_list[1]['date']:
+                    # 将 裂空武器箱,P250 | 沙丘之黄 分成两个
+                    self.check_rare_drop(inventory_list[1]['item_name'])
                     self.update_table_item_request.emit(self.row_index, 6,
                                                         f"{inventory_list[1]['item_name']}, {inventory_list[0]['item_name']}")
                     self.update_table_item_request.emit(self.row_index, 7,

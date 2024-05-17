@@ -10,14 +10,17 @@
 ## install
 
 ```bash
-    pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ## usage
 
 ```bash
-    python win_main.py
+python win_main.py
 ```
+
+## 预览
+
 
 ## feature
 
