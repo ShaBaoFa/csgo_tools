@@ -25,6 +25,7 @@ class Worker(QThread, QObject):
     finished = pyqtSignal()
     update_table_item_request = pyqtSignal(int, int, str)
     get_table_item = pyqtSignal(int, int)
+    log_message = pyqtSignal(str)  # 新的日志消息信号
 
     def __init__(self, account, password, email, email_pwd, row_index, parent=None):
         QThread.__init__(self, parent)
@@ -36,11 +37,20 @@ class Worker(QThread, QObject):
         self.row_index = row_index
         self.acc = None
         self.sql_handler = None
+        # 定义普通箱子的名称数组
+        self.normal_boxes = [
+            "梦魇武器箱",
+            "千瓦武器箱",
+            "反冲武器箱",
+            "变革武器箱",
+            "裂空武器箱",
+        ]
 
     def run(self):
         try:
             self.sql_handler = SQLHandler()
             if self.check_cache():
+                self.update_table_item_request.emit(self.row_index, 5, '已登录')
                 self.set_data_from_cache()
                 self.sql_handler.conn.close()
             else:
@@ -65,6 +75,8 @@ class Worker(QThread, QObject):
             self.finished.emit()
 
     def save_cache(self, inventory_data, vac, csgo_account):
+        if not is_this_week_drop(inventory_data[0]['date']):
+            self.log_message.emit(f"{self.account} 本周未掉落")
         # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
         self.sql_handler.insert_or_update(self.account,
                                           self.password,
@@ -75,6 +87,12 @@ class Worker(QThread, QObject):
                                           is_this_week_drop(inventory_data[0]['date']),
                                           csgo_account['rank'],
                                           csgo_account['exp'])
+
+    def check_rare_drop(self, drop_item):
+        if drop_item not in self.normal_boxes:
+            self.log_message.emit(f"恭喜! {self.account} 检测到稀有掉落: {drop_item}")
+        pass
+
 
     def check_cache(self):
         drop_time = self.sql_handler.get_drop_time(self.account)
@@ -111,6 +129,9 @@ class Worker(QThread, QObject):
         # 当前经验
         self.update_table_item_request.emit(self.row_index, 12, f"{user_info[9]}")
 
+        # 将 裂空武器箱,P250 | 沙丘之黄 分成两个
+        drop_items = user_info[4].split(',')
+        self.check_rare_drop(drop_items[0])
     def login_task(self, account, password, email, email_pwd, row_index):
         self.acc = SteamAuth(account, password, email, email_pwd)
         rsa_state, rsa_re = self.acc.get_rsa_public_key()
@@ -189,7 +210,10 @@ class Worker(QThread, QObject):
                     self.update_table_item_request.emit(self.row_index, 8,
                                                         f"{inventory_list[0]['date']}")
                 # 如果 inventory_list[0]['date'] 小于本周三上午10点，那么就是上周的掉落
-                self.update_table_item_request.emit(self.row_index, 10, f"{is_this_week_drop(inventory_list[0]['date'])}")
+                if not is_this_week_drop(inventory_list[0]['date']):
+                    self.log_message.emit(f"{self.account} 本周未掉落")
+                self.update_table_item_request.emit(self.row_index, 10,
+                                                    f"{is_this_week_drop(inventory_list[0]['date'])}")
                 return True, inventory_list
             return False, None
 
@@ -219,6 +243,9 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             return item.text()
         else:
             return None
+
+    def log_message(self, message):
+        self.msgEdit.append(message)
 
     def load_accounts_from_file(self):
         filePath, _ = QFileDialog.getOpenFileName(None, "选择账号文件", "", "Text Files (*.txt)")
@@ -286,6 +313,7 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             worker.moveToThread(thread)
             worker.update_table_item_request.connect(self.update_table_item)
             worker.get_table_item.connect(self.get_table_item)
+            worker.log_message.connect(self.log_message)
             worker.finished.connect(lambda: self.on_task_finished(thread, worker))
             thread.started.connect(worker.run)
 
