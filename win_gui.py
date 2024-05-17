@@ -220,7 +220,7 @@ class Ui_task_MainWindow(object):
         item = self.accTable.horizontalHeaderItem(11)
         item.setText(_translate("MainWindow", "等级"))
         item = self.accTable.horizontalHeaderItem(12)
-        item.setText(_translate("MainWindow", "升级还需经验"))
+        item.setText(_translate("MainWindow", "当前经验"))
         self.fuctionGroup.setTitle(_translate("MainWindow", "功能区"))
         self.addAccBut.setText(_translate("MainWindow", "导入账号"))
         self.startTaskBut.setText(_translate("MainWindow", "开始"))

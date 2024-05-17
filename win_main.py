@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QTableWidget
     QWidget, QMenu, QMessageBox
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, Qt
 from openpyxl import Workbook
+
+from sql_handler import SQLHandler
 from steam import SteamAuth
 from sda_code import generator_code
 from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_account_info, is_this_week_drop
@@ -33,18 +35,81 @@ class Worker(QThread, QObject):
         self.email_pwd = email_pwd
         self.row_index = row_index
         self.acc = None
+        self.sql_handler = None
 
     def run(self):
         try:
-            login_state = self.login_task(self.account, self.password, self.email, self.email_pwd, self.row_index)
-            if login_state:
-                self.inventory_task()
-                self.vac_check_task()
-                self.csgo_account_info_task()
+            self.sql_handler = SQLHandler()
+            if self.check_cache():
+                self.set_data_from_cache()
+                self.sql_handler.conn.close()
+            else:
+                print('not cache')
+                print('login....')
+                print(f'{self.account}')
+                print(f'{self.password}')
+                time.sleep(5)
+                login_state = self.login_task(self.account, self.password, self.email, self.email_pwd, self.row_index)
+
+                if login_state:
+                    print('login success')
+                    print(f'第 {self.row_index} 行')
+                    inventory_status, inventory_data = self.inventory_task()
+                    vac_status, vac = self.vac_check_task()
+                    account_info_status, csgo_account = self.csgo_account_info_task()
+                    self.save_cache(inventory_data, vac, csgo_account)
+                    self.sql_handler.conn.close()
         except Exception as e:
             print(f'Exception in run: {e}')
         finally:
             self.finished.emit()
+
+    def save_cache(self, inventory_data, vac, csgo_account):
+        # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
+        self.sql_handler.insert_or_update(self.account,
+                                          self.password,
+                                          inventory_data[0]['date'],
+                                          inventory_data[1]['item_name'] + ',' + inventory_data[0]['item_name'],
+                                          2,
+                                          vac,
+                                          is_this_week_drop(inventory_data[0]['date']),
+                                          csgo_account['rank'],
+                                          csgo_account['exp'])
+
+    def check_cache(self):
+        drop_time = self.sql_handler.get_drop_time(self.account)
+        if not drop_time:
+            return False
+        if is_this_week_drop(drop_time):
+            print('this week drop')
+            print('set data from cache')
+            return True
+        print('not this week drop need to update')
+        return False
+
+    def set_data_from_cache(self):
+        user_info = self.sql_handler.get_user_info(self.account)
+        # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
+        # 账号
+        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[1]}")
+        # 密码
+        self.update_table_item_request.emit(self.row_index, 3, f"{user_info[2]}")
+        # 邮箱
+        # 邮箱密码
+        # 登录状态
+        self.update_table_item_request.emit(self.row_index, 5, '已登录')
+        # 最近掉落
+        self.update_table_item_request.emit(self.row_index, 6, f"{user_info[4]}")
+        # 掉落日期
+        self.update_table_item_request.emit(self.row_index, 8, f"{user_info[3]}")
+        # VAC状态
+        self.update_table_item_request.emit(self.row_index, 9, f"{user_info[6]}")
+        # 是否是本周掉落
+        self.update_table_item_request.emit(self.row_index, 10, f"{user_info[7]}")
+        # 等级
+        self.update_table_item_request.emit(self.row_index, 11, f"{user_info[8]}")
+        # 当前经验
+        self.update_table_item_request.emit(self.row_index, 12, f"{user_info[9]}")
 
     def login_task(self, account, password, email, email_pwd, row_index):
         self.acc = SteamAuth(account, password, email, email_pwd)
@@ -53,14 +118,19 @@ class Worker(QThread, QObject):
             encode_password = self.acc.rsa_encrypt(rsa_re.publickey_mod, rsa_re.publickey_exp)
             send_state, send_re = self.acc.send_encode_request(encode_password, rsa_re.timestamp)
             if send_state:
+                print('获取验证码...')
                 if len(send_re.allowed_confirmations) > 0:
                     if send_re.allowed_confirmations[0].confirmation_type == 2:
+                        print('尝试获取邮箱令牌')
                         self.update_table_item_request.emit(row_index, 5, '尝试获取邮箱令牌')
                         pass
                     if send_re.allowed_confirmations[0].confirmation_type == 3:
+                        print('尝试获取手机令牌')
                         self.update_table_item_request.emit(row_index, 5, '尝试获取手机令牌')
                         gen_state, code = generator_code(self.acc.steam_id, self.acc.username)
                         if gen_state:
+                            print('获取验证码成功')
+                            print(f'code: {code}')
                             state = self.acc.auth_code(code)
                             if state:
                                 token_state = self.acc.get_token()
@@ -74,6 +144,7 @@ class Worker(QThread, QObject):
                             self.update_table_item_request.emit(row_index, 5, '获取验证码错误')
                             return False
             else:
+                print('获取密钥失败')
                 self.update_table_item_request.emit(row_index, 5, '登陆失败')
                 return False
         else:
@@ -87,12 +158,16 @@ class Worker(QThread, QObject):
             print(account_info)
             self.update_table_item_request.emit(self.row_index, 11, f"{account_info['rank']}")
             self.update_table_item_request.emit(self.row_index, 12, f"{account_info['exp']}")
+            return True, account_info
+        return False, None
 
     def vac_check_task(self):
         state, vac_re = self.acc.get_vac_status()
         if state:
             vac, vac_mes = regex_vac_status(vac_re)
             self.update_table_item_request.emit(self.row_index, 9, f"{vac},{vac_mes}")
+            return True, vac
+        return False, None
 
     def inventory_task(self):
         inventory_state, inventory_re = self.acc.get_history_inventory()
@@ -114,11 +189,9 @@ class Worker(QThread, QObject):
                     self.update_table_item_request.emit(self.row_index, 8,
                                                         f"{inventory_list[0]['date']}")
                 # 如果 inventory_list[0]['date'] 小于本周三上午10点，那么就是上周的掉落
-                if is_this_week_drop(inventory_list[0]['date']):
-                    self.update_table_item_request.emit(self.row_index, 10,  f"是")
-            else:
-                self.update_table_item_request.emit(self.row_index, 10, f"否")
-                self.update_table_item_request.emit(self.row_index, 7, f"0")
+                self.update_table_item_request.emit(self.row_index, 10, f"{is_this_week_drop(inventory_list[0]['date'])}")
+                return True, inventory_list
+            return False, None
 
 
 class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
@@ -263,6 +336,10 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         invertSelectionAction = menu.addAction("选中掉落数量大于0的账户")
         invertSelectionAction.triggered.connect(self.select_num_gt_0)
 
+        # 选中本周掉落等于0的账户
+        invertSelectionAction = menu.addAction("选中本周未掉落的账户")
+        invertSelectionAction.triggered.connect(self.select_week_drop_eq_0())
+
         # 添加删除选中行动作
         deleteSelectedAction = menu.addAction("删除选中行")
         deleteSelectedAction.triggered.connect(self.deleteSelectedRows)
@@ -282,6 +359,14 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         for i in range(self.accTable.rowCount()):
             num = self.get_table_item(i, 7)
             if num and int(num) > 0:
+                self.accTable.item(i, 0).setCheckState(Qt.Checked)
+            else:
+                self.accTable.item(i, 0).setCheckState(Qt.Unchecked)
+
+    def select_week_drop_eq_0(self):
+        for i in range(self.accTable.rowCount()):
+            is_this_week_drop = self.get_table_item(i, 10)
+            if is_this_week_drop and is_this_week_drop == 'False':
                 self.accTable.item(i, 0).setCheckState(Qt.Checked)
             else:
                 self.accTable.item(i, 0).setCheckState(Qt.Unchecked)

@@ -115,19 +115,27 @@ def is_this_week_drop(date_str):
         return False
     # 获取当前日期和时间
     now = datetime.now()
+    # 计算当前日期是本周的第几天（周一为0，周二为1，...，周日为6）
+    current_weekday = now.weekday()
 
-    # 计算本周三的日期
-    this_wednesday = now + timedelta((2 - now.weekday()) % 7)
-
-    # 设置本周三上午10点的时间
+    # 计算本周三上午10点的时间
+    this_wednesday = now + timedelta((2 - current_weekday) % 7)
     this_wednesday_10am = datetime(this_wednesday.year, this_wednesday.month, this_wednesday.day, 10, 0, 0)
-    # 如果当前时间为周一或者周二或者本周三10点前，则设置为上周三
-    if now.weekday() == 0 or now.weekday() == 1 or (now.weekday() == 2 and now.hour < 10):
-        this_wednesday_10am -= timedelta(7)
-    print(date)
-    print(this_wednesday_10am)
-    # 比较日期是否大于本周三上午10点
-    if date > this_wednesday_10am:
-        return True
+
+    # 如果现在时间是本周三上午10点之后
+    if now > this_wednesday_10am:
+        result_time = this_wednesday_10am
     else:
-        return False
+        # 如果现在时间是本周三上午10点之前，则设置为上周三上午10点
+        last_wednesday = this_wednesday - timedelta(weeks=1)
+        last_wednesday_10am = datetime(last_wednesday.year, last_wednesday.month, last_wednesday.day, 10, 0, 0)
+        result_time = last_wednesday_10am
+    print("掉落时间：", date)
+    print("设定的时间是：", result_time)
+    # 比较日期是否大于本周三上午10点
+    if date > result_time:
+        print("是本周掉落")
+        return 1
+    else:
+        print("不是本周掉落")
+        return 0
