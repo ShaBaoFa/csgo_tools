@@ -18,7 +18,7 @@ from sql_handler import SQLHandler
 from steam import SteamAuth
 from sda_code import generator_code
 from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_account_info, is_this_week_drop
-from win_gui import Ui_task_MainWindow
+from win_gui import Ui_task_MainWindow, Ui_login_MainWindow
 
 
 class Worker(QThread, QObject):
@@ -109,9 +109,9 @@ class Worker(QThread, QObject):
         user_info = self.sql_handler.get_user_info(self.account)
         # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
         # 账号
-        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[1]}")
+        self.update_table_item_request.emit(self.row_index, 1, f"{user_info[1]}")
         # 密码
-        self.update_table_item_request.emit(self.row_index, 3, f"{user_info[2]}")
+        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[2]}")
         # 邮箱
         # 邮箱密码
         # 登录状态
@@ -219,6 +219,26 @@ class Worker(QThread, QObject):
                 return True, inventory_list
             return False, None
 
+
+class Ui_LoginWindow(QMainWindow, Ui_login_MainWindow):
+    def __init__(self):
+        super(Ui_LoginWindow, self).__init__()
+        self.setupUi(self)  # 使用 Ui_login_MainWindow 来设置界面
+
+    def handle_login(self):
+        username = self.lineEdit_2.text()
+        password = self.lineEdit.text()
+        if self.validate_credentials(username, password):
+            self.main_window = Ui_MainWindow()
+            self.main_window.show()
+            self.close()
+        else:
+            QtWidgets.QMessageBox.warning(self, '错误', '用户名或密码错误')
+    def validate_credentials(self, username, password):
+        print(username)
+        print(password)
+        # 简单的验证逻辑
+        return username == "admin" and password == "password"
 
 class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
     def __init__(self):
@@ -439,13 +459,10 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             # 提示保存成功
             QMessageBox.information(None, "导出成功", f"账号信息已成功导出到 {fileName}")
 
-
 import sys
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    MainWindow = QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()
+    login_window = Ui_LoginWindow()
+    login_window.show()
     sys.exit(app.exec_())

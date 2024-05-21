@@ -13,6 +13,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from PyQt5.QtCore import Qt
 
+
+
 class Ui_login_MainWindow(object):
     def setupUi(self, login_MainWindow):
         login_MainWindow.setObjectName("login_MainWindow")
@@ -23,7 +25,7 @@ class Ui_login_MainWindow(object):
         self.centralwidget.setEnabled(True)
         self.centralwidget.setObjectName("centralwidget")
         self.label_3 = QtWidgets.QLabel(self.centralwidget)
-        self.label_3.setGeometry(QtCore.QRect(90, 30, 391, 79))
+        self.label_3.setGeometry(QtCore.QRect(190, 30, 391, 79))
         font = QtGui.QFont()
         font.setPointSize(16)
         font.setBold(True)
@@ -34,19 +36,19 @@ class Ui_login_MainWindow(object):
         # 启用自动换行
         self.label_3.setWordWrap(True)
         self.label_2 = QtWidgets.QLabel(self.centralwidget)
-        self.label_2.setGeometry(QtCore.QRect(100, 200, 71, 41))
+        self.label_2.setGeometry(QtCore.QRect(100, 200, 181, 41))
         font = QtGui.QFont()
         font.setPointSize(15)
         self.label_2.setFont(font)
         self.label_2.setObjectName("label_2")
         self.label = QtWidgets.QLabel(self.centralwidget)
-        self.label.setGeometry(QtCore.QRect(100, 150, 81, 41))
+        self.label.setGeometry(QtCore.QRect(100, 150, 181, 41))
         font = QtGui.QFont()
         font.setPointSize(15)
         self.label.setFont(font)
         self.label.setObjectName("label")
         self.lineEdit = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit.setGeometry(QtCore.QRect(180, 200, 221, 41))
+        self.lineEdit.setGeometry(QtCore.QRect(220, 200, 221, 41))
         font = QtGui.QFont()
         font.setPointSize(15)
         self.lineEdit.setFont(font)
@@ -54,7 +56,7 @@ class Ui_login_MainWindow(object):
         self.lineEdit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.lineEdit.setObjectName("lineEdit")
         self.lineEdit_2 = QtWidgets.QLineEdit(self.centralwidget)
-        self.lineEdit_2.setGeometry(QtCore.QRect(180, 150, 221, 41))
+        self.lineEdit_2.setGeometry(QtCore.QRect(220, 150, 221, 41))
         font = QtGui.QFont()
         font.setPointSize(15)
         self.lineEdit_2.setFont(font)
@@ -72,16 +74,16 @@ class Ui_login_MainWindow(object):
         self.menubar.setGeometry(QtCore.QRect(0, 0, 575, 22))
         self.menubar.setObjectName("menubar")
         login_MainWindow.setMenuBar(self.menubar)
-
+        self.pushButton.clicked.connect(self.handle_login)
         self.retranslateUi(login_MainWindow)
         QtCore.QMetaObject.connectSlotsByName(login_MainWindow)
 
     def retranslateUi(self, login_MainWindow):
         _translate = QtCore.QCoreApplication.translate
         login_MainWindow.setWindowTitle(_translate("login_MainWindow", "MainWindow"))
-        self.label_3.setText(_translate("login_MainWindow", "免费试用中\n纯本地运行 不中转任何私人服务器\nQ群：952966566 获取最新密码"))
+        self.label_3.setText(_translate("login_MainWindow", "csgo信息查询"))
         self.label_2.setText(_translate("login_MainWindow", "密码："))
-        self.label.setText(_translate("login_MainWindow", "用户名："))
+        self.label.setText(_translate("login_MainWindow", "用户名:"))
         self.lineEdit_2.setText(_translate("login_MainWindow", ""))
         self.pushButton.setText(_translate("login_MainWindow", "登录"))
 
@@ -95,7 +97,7 @@ class Ui_task_MainWindow(object):
         self.accTable.setGeometry(QtCore.QRect(0, 0, 711, 401))
         self.accTable.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.accTable.setObjectName("accTable")
-        self.accTable.setColumnCount(20)
+        self.accTable.setColumnCount(13)
 
         self.accTable.setRowCount(0)
         item = QtWidgets.QTableWidgetItem()
@@ -131,16 +133,16 @@ class Ui_task_MainWindow(object):
         # 为每一列设置特定的列宽
         self.accTable.setColumnWidth(0, 30)  # 为第一列设置100像素宽
         self.accTable.setColumnWidth(1, 85)  # 为第二列设置150像素宽
-        self.accTable.setColumnWidth(2, 0)  # 为第三列设置150像素宽
-        self.accTable.setColumnWidth(3, 0)  # 以此类推...
-        self.accTable.setColumnWidth(4, 0)
-        self.accTable.setColumnWidth(5, 0)
-        self.accTable.setColumnWidth(6, 50)
-        self.accTable.setColumnWidth(7, 0)
+        self.accTable.setColumnWidth(2, 100)  # 为第三列设置150像素宽
+        self.accTable.setColumnWidth(3, 100)  # 以此类推...
+        self.accTable.setColumnWidth(4, 100)
+        self.accTable.setColumnWidth(5, 100)
+        self.accTable.setColumnWidth(6, 100)
+        self.accTable.setColumnWidth(7, 100)
         self.accTable.setColumnWidth(8, 200)
-        self.accTable.setColumnWidth(9, 70)
-        self.accTable.setColumnWidth(10, 70)
-        self.accTable.setColumnWidth(11, 70)
+        self.accTable.setColumnWidth(9, 100)
+        self.accTable.setColumnWidth(10, 100)
+        self.accTable.setColumnWidth(11, 100)
         self.accTable.setColumnWidth(12, 100)
         self.fuctionGroup = QtWidgets.QGroupBox(self.centralwidget)
         self.fuctionGroup.setGeometry(QtCore.QRect(720, 0, 201, 401))
@@ -151,12 +153,12 @@ class Ui_task_MainWindow(object):
         self.startTaskBut = QtWidgets.QPushButton(self.fuctionGroup)
         self.startTaskBut.setGeometry(QtCore.QRect(50, 330, 91, 31))
         self.startTaskBut.setObjectName("startTaskBut")
-        self.pop3Edit = QtWidgets.QLineEdit(self.fuctionGroup)
-        self.pop3Edit.setGeometry(QtCore.QRect(80, 29, 111, 31))
-        self.pop3Edit.setObjectName("pop3Edit")
-        self.pop3Label = QtWidgets.QLabel(self.fuctionGroup)
-        self.pop3Label.setGeometry(QtCore.QRect(20, 40, 54, 12))
-        self.pop3Label.setObjectName("pop3Label")
+        # self.pop3Edit = QtWidgets.QLineEdit(self.fuctionGroup)
+        # self.pop3Edit.setGeometry(QtCore.QRect(80, 29, 111, 31))
+        # self.pop3Edit.setObjectName("pop3Edit")
+        # self.pop3Label = QtWidgets.QLabel(self.fuctionGroup)
+        # self.pop3Label.setGeometry(QtCore.QRect(20, 40, 54, 12))
+        # self.pop3Label.setObjectName("pop3Label")
         self.threadNumEdit = QtWidgets.QLineEdit(self.fuctionGroup)
         self.threadNumEdit.setGeometry(QtCore.QRect(80, 79, 111, 31))
         self.threadNumEdit.setObjectName("pop3Edit")
@@ -224,8 +226,7 @@ class Ui_task_MainWindow(object):
         self.fuctionGroup.setTitle(_translate("MainWindow", "功能区"))
         self.addAccBut.setText(_translate("MainWindow", "导入账号"))
         self.startTaskBut.setText(_translate("MainWindow", "开始"))
-        self.pop3Label.setText(_translate("MainWindow", "POP3地址"))
+        # self.pop3Label.setText(_translate("MainWindow", "POP3地址"))
         self.threadNumLabel.setText(_translate("MainWindow", "线程数"))
         self.outputAccBut.setText(_translate("MainWindow", "导出账号"))
-        # self.checkBox.setText(_translate("MainWindow", "读取Mf文件"))
         self.msgGroup.setTitle(_translate("MainWindow", "日志"))
