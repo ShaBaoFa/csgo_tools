@@ -66,3 +66,10 @@ class SQLHandler:
                 (user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
             )
         self.conn.commit()
+
+    def get_all_accounts(self):
+        self.cursor.execute('SELECT user_account,user_password FROM user_info')
+        result = self.cursor.fetchall()
+        if result:
+            return result
+        return None

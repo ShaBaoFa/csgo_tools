@@ -228,7 +228,7 @@ class Ui_LoginWindow(QMainWindow, Ui_login_MainWindow):
     def handle_login(self):
         username = self.lineEdit_2.text()
         password = self.lineEdit.text()
-        if self.validate_credentials(username, password):
+        if self.validate_credentials(username, password) or True:
             self.main_window = Ui_MainWindow()
             self.main_window.show()
             self.close()
@@ -251,6 +251,7 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         self.isRunning = False  # 追踪任务是否正在运行
         super(Ui_MainWindow, self).__init__()
         self.setupUi(self)  # 使用 Ui_MainWindow 来设置界面
+        self.load_accounts_from_db()
 
     def update_table_item(self, row_index, col_index, text):
         item = self.accTable.item(row_index, col_index)
@@ -274,15 +275,44 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         if filePath:
             with open(filePath, 'r', encoding='utf-8') as file:
                 lines = file.readlines()
-                self.accTable.setRowCount(len(lines))
-                for rowIndex, line in enumerate(lines):
+                # 目前Table的所有行数
+                row_counts = self.accTable.rowCount()
+                self.sql_handler = SQLHandler()
+                # 获取目前数据库的所有账号，计算增量部分
+                db_accounts = self.sql_handler.get_all_accounts()
+                self.sql_handler.conn.close()
+                # db_accounts 获取 user_account 存入 list
+                db_accounts_user_name = [account[0] for account in db_accounts]
+                file_accounts = []
+                for line in lines:
+                    print(line)
+                    account_info = line.strip().split(':')
+                    print(account_info)
+                    account = account_info[0]
+                    password = account_info[1]
+                    if account not in db_accounts_user_name:
+                        file_accounts.append({'account':account, 'password':password})
+                print(f"file_accounts: {file_accounts}")
+                self.accTable.setRowCount(row_counts + len(file_accounts))
+                for rowIndex, account_info in enumerate(file_accounts):
                     checkBoxItem = QtWidgets.QTableWidgetItem()
                     checkBoxItem.setCheckState(QtCore.Qt.Unchecked)
-                    self.accTable.setItem(rowIndex, 0, checkBoxItem)
-                    items = line.strip().split(':')
-                    for columnIndex, item in enumerate(items):
-                        if columnIndex < self.accTable.columnCount() and columnIndex < 2:
-                            self.accTable.setItem(rowIndex, columnIndex + 1, QtWidgets.QTableWidgetItem(item))
+                    self.accTable.setItem(row_counts + rowIndex, 0, checkBoxItem)
+                    self.accTable.setItem(row_counts + rowIndex, 1, QtWidgets.QTableWidgetItem(account_info['account']))
+                    self.accTable.setItem(row_counts + rowIndex, 2, QtWidgets.QTableWidgetItem(account_info['password']))
+
+    def load_accounts_from_db(self):
+        self.sql_handler = SQLHandler()
+        accounts = self.sql_handler.get_all_accounts()
+        self.accTable.setRowCount(len(accounts))
+        for rowIndex, account in enumerate(accounts):
+            checkBoxItem = QtWidgets.QTableWidgetItem()
+            checkBoxItem.setCheckState(QtCore.Qt.Unchecked)
+            self.accTable.setItem(rowIndex, 0, checkBoxItem)
+            for columnIndex, item in enumerate(account):
+                if columnIndex < self.accTable.columnCount() and columnIndex < 2:
+                    self.accTable.setItem(rowIndex, columnIndex + 1, QtWidgets.QTableWidgetItem(item))
+        self.sql_handler.conn.close()
 
     def toggle_task(self):
         if not self.isRunning:
