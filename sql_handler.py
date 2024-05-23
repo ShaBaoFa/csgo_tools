@@ -25,12 +25,19 @@ normal_boxes = [
     "变革武器箱",
     "裂空武器箱",
 ]
+import sys
+import os
 
+
+def resource_path(relative_path):
+    """ 获取资源文件的绝对路径 """
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 class SQLHandler:
     def __init__(self, db_name='user_info.db'):
-        self.conn = sqlite3.connect(db_name)
+        db_path = resource_path(db_name)
+        self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
-
         # 如果表不存在则创建表
         self.cursor.execute(user_info_table)
         self.conn.commit()

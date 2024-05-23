@@ -329,7 +329,8 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         global g_accounts
         sql_handler = SQLHandler()
         accounts = sql_handler.get_all_accounts()
-        if len(accounts) > 0:
+        # 如果 accounts 不为 None
+        if accounts and len(accounts) > 0:
             g_accounts = accounts
         self.accTable.setRowCount(len(g_accounts))
         for rowIndex, account in enumerate(g_accounts):
