@@ -46,14 +46,17 @@ def regex_vac_status(text):
     soup = BeautifulSoup(text, 'html.parser')
     # 找到vac状态
     vac_status = soup.find("div", class_="no_vac_bans_header")
-
+    ban_vac_status = soup.find("div", class_="no_vac_bans_header")
     # 如果存在,则vac为0
     if vac_status:
         vac = 0
         vac_mes = '无封禁'
-    else:
+    elif ban_vac_status:
         vac = 1
         vac_mes = '有封禁'
+    else:
+        vac = -1
+        vac_mes = '未知'
     return vac, vac_mes
 
 
@@ -100,7 +103,6 @@ def parse_datetime(date_str):
         if ampm == "下午" and hour != 12:
             hour += 12
 
-        print(f"{year}年{month}月{day}日{ampm} {hour}时{minute}分")
     else:
         return None
     # 返回 datetime 对象
@@ -108,7 +110,6 @@ def parse_datetime(date_str):
 
 
 def is_this_week_drop(date_str):
-    print(date_str)
     # 将日期字符串转换为 datetime 对象
     date = parse_datetime(date_str)
     if date is None:
@@ -130,12 +131,8 @@ def is_this_week_drop(date_str):
         last_wednesday = this_wednesday - timedelta(weeks=1)
         last_wednesday_10am = datetime(last_wednesday.year, last_wednesday.month, last_wednesday.day, 10, 0, 0)
         result_time = last_wednesday_10am
-    print("掉落时间：", date)
-    print("设定的时间是：", result_time)
     # 比较日期是否大于本周三上午10点
     if date > result_time:
-        print("是本周掉落")
         return 1
     else:
-        print("不是本周掉落")
         return 0

@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import requests
 import rsa
@@ -20,12 +21,12 @@ from steam_pb2 import (
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
 class SteamAuth:
-    def __init__(self, username, password, email, email_pwd):
+    def __init__(self, username, password):
         self.username = username
         self.password = password
-        self.email = email
-        self.email_pwd = email_pwd
         self.ua = UserAgent().chrome
         self.session_id = self.get_session_id()
         self.browser_id = self.get_browser_id()
@@ -39,6 +40,38 @@ class SteamAuth:
         self.request_id = None
         self.access_token = None
         self.refresh_token = None
+
+    # 序列化
+    def serialize(self):
+        my_dict = {
+            'username': self.username,
+            'password': self.password,
+            'ua': self.ua,
+            'session_id': self.session_id,
+            'browser_id': self.browser_id,
+            'headers': self.headers,
+            'steam_id': self.steam_id,
+            'client_id': self.client_id,
+            'request_id': base64.b64encode(self.request_id).decode('utf-8'),
+            'access_token': self.access_token,
+            'refresh_token': self.refresh_token,
+        }
+        return json.dumps(my_dict)
+
+    # 反序列化
+    def deserialize(self, data):
+        my_dict = json.loads(data)
+        self.username = my_dict['username']
+        self.password = my_dict['password']
+        self.ua = my_dict['ua']
+        self.session_id = my_dict['session_id']
+        self.browser_id = my_dict['browser_id']
+        self.headers = my_dict['headers']
+        self.steam_id = my_dict['steam_id']
+        self.client_id = my_dict['client_id']
+        self.request_id = base64.b64decode(my_dict['request_id']),
+        self.access_token = my_dict['access_token']
+        self.refresh_token = my_dict['refresh_token']
 
     def get_session_id(self):
         bytes_length = 12
@@ -142,7 +175,6 @@ class SteamAuth:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)
 
-
     '''
     验证验证码
     '''
@@ -179,6 +211,7 @@ class SteamAuth:
                     return False, str(e)
             except Exception as e:
                 return False, str(e)
+
     '''
     获取token
     '''
@@ -305,9 +338,40 @@ class SteamAuth:
                     return False, "网络状态返回错误"
             except RequestException as e:
                 attempt += 1
-                logging.error(f"Function : get_rsa_public_key ,Attempt {attempt} failed with exception: {e}")
+                logging.error(f"Function : get_vac_status ,Attempt {attempt} failed with exception: {e}")
                 if attempt == max_attempts:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)
 
-
+    def check_session(self):
+        url = 'https://store.steampowered.com/account/'
+        cookies = {
+            'sessionid': str(self.session_id),
+            'steamid': str(self.steam_id),
+            'steamLoginSecure': f'{self.steam_id}%7C%7C{self.access_token}',
+            'steamRefresh_steam': f'{self.steam_id}%7C%7C{self.refresh_token}',
+            'browserid': str(self.browser_id),
+            'timezoneOffset': '28800,0',
+            'steamCountry': 'CN%7C65c6e647746973917498bae6bced5fb9'
+        }
+        headers = {
+            'user-agent': self.ua,
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        attempt = 0
+        max_attempts = 5
+        while attempt < max_attempts:
+            try:
+                response = requests.get(url, headers=headers, cookies=cookies, timeout=5)
+                if response.status_code == 200:
+                    return True
+                elif response.status_code == 302:
+                    return False
+                else:
+                    return False, "网络状态返回错误"
+            except RequestException as e:
+                attempt += 1
+                logging.error(f"Function : check_session ,Attempt {attempt} failed with exception: {e}")
+                if attempt == max_attempts:
+                    # 最后一次尝试失败，返回False和异常信息
+                    return False, str(e)

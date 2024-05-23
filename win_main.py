@@ -17,9 +17,11 @@ from openpyxl import Workbook
 from sql_handler import SQLHandler
 from steam import SteamAuth
 from sda_code import generator_code
-from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_account_info, is_this_week_drop
+from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_account_info, is_this_week_drop, \
+    parse_datetime
 from win_gui import Ui_task_MainWindow, Ui_login_MainWindow
 
+g_accounts = []
 
 class Worker(QThread, QObject):
     finished = pyqtSignal()
@@ -27,13 +29,11 @@ class Worker(QThread, QObject):
     get_table_item = pyqtSignal(int, int)
     log_message = pyqtSignal(str)  # 新的日志消息信号
 
-    def __init__(self, account, password, email, email_pwd, row_index, parent=None):
+    def __init__(self, account, row_index, parent=None):
         QThread.__init__(self, parent)
         QObject.__init__(self, parent)
         self.account = account
-        self.password = password
-        self.email = email
-        self.email_pwd = email_pwd
+        self.password = None
         self.row_index = row_index
         self.acc = None
         self.sql_handler = None
@@ -46,30 +46,45 @@ class Worker(QThread, QObject):
             "裂空武器箱",
         ]
 
+    def set_acc(self):
+        # self.acc 序列化
+        session_str = self.acc.serialize()
+        self.sql_handler.set_account_session(self.acc.username, session_str)
+
+    def get_acc_from_db(self):
+        session = self.sql_handler.get_account_session(self.account)
+        if session:
+            auth = SteamAuth(self.account, self.password)
+            auth.deserialize(session)
+            self.acc = auth
+            return True
+        return False
+
     def run(self):
+        step = 0
         try:
             self.sql_handler = SQLHandler()
             if self.check_cache():
-                self.update_table_item_request.emit(self.row_index, 5, '已登录')
+                self.update_table_item_request.emit(self.row_index, 1, '读取缓存中..')
                 self.set_data_from_cache()
                 self.sql_handler.conn.close()
             else:
-                print('not cache')
-                print('login....')
-                print(f'{self.account}')
-                print(f'{self.password}')
-                time.sleep(5)
-                login_state = self.login_task(self.account, self.password, self.email, self.email_pwd, self.row_index)
-
+                self.password = g_accounts[self.row_index][1]
+                login_state = self.login_task(self.account, self.password, self.row_index)
+                step += 1
                 if login_state:
-                    print('login success')
-                    print(f'第 {self.row_index} 行')
+                    print(f'{self.account}---{self.password}---login_success')
                     inventory_status, inventory_data = self.inventory_task()
+                    step += 1
                     vac_status, vac = self.vac_check_task()
+                    step += 1
                     account_info_status, csgo_account = self.csgo_account_info_task()
+                    step += 1
                     self.save_cache(inventory_data, vac, csgo_account)
+                    step += 1
                     self.sql_handler.conn.close()
         except Exception as e:
+            print(f"{self.account}在第{step}步出现异常")
             print(f'Exception in run: {e}')
         finally:
             self.finished.emit()
@@ -93,61 +108,63 @@ class Worker(QThread, QObject):
             self.log_message.emit(f"恭喜! {self.account} 检测到稀有掉落: {drop_item}")
         pass
 
-
     def check_cache(self):
         drop_time = self.sql_handler.get_drop_time(self.account)
         if not drop_time:
             return False
         if is_this_week_drop(drop_time):
-            print('this week drop')
-            print('set data from cache')
             return True
-        print('not this week drop need to update')
         return False
 
     def set_data_from_cache(self):
         user_info = self.sql_handler.get_user_info(self.account)
         # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
         # 账号
-        self.update_table_item_request.emit(self.row_index, 1, f"{user_info[1]}")
-        # 密码
-        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[2]}")
-        # 邮箱
-        # 邮箱密码
+        self.update_table_item_request.emit(self.row_index, 0, f"{user_info[1]}")
         # 登录状态
-        self.update_table_item_request.emit(self.row_index, 5, '已登录')
+        self.update_table_item_request.emit(self.row_index, 1, '读取缓存')
         # 最近掉落
-        self.update_table_item_request.emit(self.row_index, 6, f"{user_info[4]}")
+        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[4]}")
         # 掉落日期
-        self.update_table_item_request.emit(self.row_index, 8, f"{user_info[3]}")
+        self.update_table_item_request.emit(self.row_index, 3, f"{user_info[3]}")
         # VAC状态
-        self.update_table_item_request.emit(self.row_index, 9, f"{user_info[6]}")
+        self.update_table_item_request.emit(self.row_index, 4, f"{user_info[6]}")
         # 是否是本周掉落
-        self.update_table_item_request.emit(self.row_index, 10, f"{user_info[7]}")
+        self.update_table_item_request.emit(self.row_index, 5, f"{user_info[7]}")
         # 等级
-        self.update_table_item_request.emit(self.row_index, 11, f"{user_info[8]}")
+        self.update_table_item_request.emit(self.row_index, 6, f"{user_info[8]}")
         # 当前经验
-        self.update_table_item_request.emit(self.row_index, 12, f"{user_info[9]}")
+        self.update_table_item_request.emit(self.row_index, 7, f"{user_info[9]}")
 
         # 将 裂空武器箱,P250 | 沙丘之黄 分成两个
         drop_items = user_info[4].split(',')
         self.check_rare_drop(drop_items[0])
-    def login_task(self, account, password, email, email_pwd, row_index):
-        self.acc = SteamAuth(account, password, email, email_pwd)
+
+    def login_task(self, account, password, row_index):
+        if self.get_acc_from_db() and self.acc.check_session():
+            self.update_table_item_request.emit(row_index, 1, '登录成功')
+            return True
+        self.acc = SteamAuth(account, password)
         rsa_state, rsa_re = self.acc.get_rsa_public_key()
+        # 休息1秒
+        time.sleep(1)
         if rsa_state:
             encode_password = self.acc.rsa_encrypt(rsa_re.publickey_mod, rsa_re.publickey_exp)
+            # 休息1秒
+            time.sleep(1)
             send_state, send_re = self.acc.send_encode_request(encode_password, rsa_re.timestamp)
+            # 休息1秒
+            time.sleep(1)
             if send_state:
                 print('获取验证码...')
                 if len(send_re.allowed_confirmations) > 0:
                     if send_re.allowed_confirmations[0].confirmation_type == 2:
                         print('尝试获取邮箱令牌')
-                        self.update_table_item_request.emit(row_index, 5, '尝试获取邮箱令牌')
+                        self.update_table_item_request.emit(row_index, 1, '尝试获取邮箱令牌')
                         pass
                     if send_re.allowed_confirmations[0].confirmation_type == 3:
                         print('尝试获取手机令牌')
-                        self.update_table_item_request.emit(row_index, 5, '尝试获取手机令牌')
+                        self.update_table_item_request.emit(row_index, 1, '尝试获取手机令牌')
                         gen_state, code = generator_code(self.acc.steam_id, self.acc.username)
                         if gen_state:
                             print('获取验证码成功')
@@ -156,68 +173,75 @@ class Worker(QThread, QObject):
                             if state:
                                 token_state = self.acc.get_token()
                                 if token_state:
-                                    self.update_table_item_request.emit(row_index, 5, '登录成功')
+                                    self.set_acc()
+                                    self.update_table_item_request.emit(row_index, 1, '登录成功')
                                     return True
                                 else:
-                                    self.update_table_item_request.emit(row_index, 5, '登陆失败')
+                                    self.update_table_item_request.emit(row_index, 1, '登陆失败')
                                     return False
                         else:
-                            self.update_table_item_request.emit(row_index, 5, '获取验证码错误')
+                            self.update_table_item_request.emit(row_index, 1, '获取验证码错误')
                             return False
             else:
                 print('获取密钥失败')
-                self.update_table_item_request.emit(row_index, 5, '登陆失败')
+                self.update_table_item_request.emit(row_index, 1, '登陆失败')
                 return False
         else:
-            self.update_table_item_request.emit(row_index, 5, '获取密钥失败')
+            self.update_table_item_request.emit(row_index, 1, '获取密钥失败')
             return False
 
     def csgo_account_info_task(self):
+        self.update_table_item_request.emit(self.row_index, 1, '正在获取CSGO账户信息...')
         state, account_re = self.acc.get_csgo_account_info()
         if state:
+            self.update_table_item_request.emit(self.row_index, 1, '获取CSGO账户信息成功')
             account_info = regex_csgo_account_info(account_re)
-            print(account_info)
-            self.update_table_item_request.emit(self.row_index, 11, f"{account_info['rank']}")
-            self.update_table_item_request.emit(self.row_index, 12, f"{account_info['exp']}")
+            self.update_table_item_request.emit(self.row_index, 6, f"{account_info['rank']}")
+            self.update_table_item_request.emit(self.row_index, 7, f"{account_info['exp']}")
             return True, account_info
+        self.update_table_item_request.emit(self.row_index, 1, '获取CSGO账户信息失败')
         return False, None
 
     def vac_check_task(self):
+        self.update_table_item_request.emit(self.row_index, 1, '正在获取VAC状态...')
         state, vac_re = self.acc.get_vac_status()
         if state:
+            self.update_table_item_request.emit(self.row_index, 1, '获取VAC状态成功')
             vac, vac_mes = regex_vac_status(vac_re)
-            self.update_table_item_request.emit(self.row_index, 9, f"{vac},{vac_mes}")
+            self.update_table_item_request.emit(self.row_index, 4, f"{vac},{vac_mes}")
             return True, vac
+        self.update_table_item_request.emit(self.row_index, 1, '获取VAC状态失败')
         return False, None
 
     def inventory_task(self):
+        self.update_table_item_request.emit(self.row_index, 1, '正在获取掉落信息...')
         inventory_state, inventory_re = self.acc.get_history_inventory()
         if inventory_state:
+            self.update_table_item_request.emit(self.row_index, 1, '获取掉落信息成功')
             inventory_list = regex_recently_dropped(inventory_re)
             if inventory_list:
                 if inventory_list[0]['date'] == inventory_list[1]['date']:
                     # 将 裂空武器箱,P250 | 沙丘之黄 分成两个
                     self.check_rare_drop(inventory_list[1]['item_name'])
-                    self.update_table_item_request.emit(self.row_index, 6,
+                    self.update_table_item_request.emit(self.row_index, 2,
                                                         f"{inventory_list[1]['item_name']}, {inventory_list[0]['item_name']}")
-                    self.update_table_item_request.emit(self.row_index, 7,
-                                                        "2")
-                    self.update_table_item_request.emit(self.row_index, 8,
+                    self.update_table_item_request.emit(self.row_index, 3,
                                                         f"{inventory_list[0]['date']}")
                 else:
-                    self.update_table_item_request.emit(self.row_index, 6,
+                    self.update_table_item_request.emit(self.row_index, 2,
                                                         f"{inventory_list[0]['item_name']}")
-                    self.update_table_item_request.emit(self.row_index, 7,
-                                                        "1")
-                    self.update_table_item_request.emit(self.row_index, 8,
+                    self.update_table_item_request.emit(self.row_index, 3,
                                                         f"{inventory_list[0]['date']}")
                 # 如果 inventory_list[0]['date'] 小于本周三上午10点，那么就是上周的掉落
-                if not is_this_week_drop(inventory_list[0]['date']):
-                    self.log_message.emit(f"{self.account} 本周未掉落")
-                self.update_table_item_request.emit(self.row_index, 10,
+
+                self.update_table_item_request.emit(self.row_index, 5,
                                                     f"{is_this_week_drop(inventory_list[0]['date'])}")
                 return True, inventory_list
-            return False, None
+            else:
+                self.update_table_item_request.emit(self.row_index, 2, '未掉落')
+                return False, None
+        self.update_table_item_request.emit(self.row_index, 1, '获取掉落信息失败')
+        return False, None
 
 
 class Ui_LoginWindow(QMainWindow, Ui_login_MainWindow):
@@ -234,11 +258,11 @@ class Ui_LoginWindow(QMainWindow, Ui_login_MainWindow):
             self.close()
         else:
             QtWidgets.QMessageBox.warning(self, '错误', '用户名或密码错误')
+
     def validate_credentials(self, username, password):
-        print(username)
-        print(password)
         # 简单的验证逻辑
         return username == "admin" and password == "password"
+
 
 class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
     def __init__(self):
@@ -277,42 +301,42 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
                 lines = file.readlines()
                 # 目前Table的所有行数
                 row_counts = self.accTable.rowCount()
-                self.sql_handler = SQLHandler()
+                sql_handler = SQLHandler()
                 # 获取目前数据库的所有账号，计算增量部分
-                db_accounts = self.sql_handler.get_all_accounts()
-                self.sql_handler.conn.close()
+                db_accounts = sql_handler.get_all_accounts()
                 # db_accounts 获取 user_account 存入 list
-                db_accounts_user_name = [account[0] for account in db_accounts]
+                if db_accounts:
+                    db_accounts_user_name = [account[0] for account in db_accounts]
+                else:
+                    db_accounts_user_name = []
                 file_accounts = []
                 for line in lines:
-                    print(line)
                     account_info = line.strip().split(':')
-                    print(account_info)
                     account = account_info[0]
                     password = account_info[1]
                     if account not in db_accounts_user_name:
-                        file_accounts.append({'account':account, 'password':password})
-                print(f"file_accounts: {file_accounts}")
-                self.accTable.setRowCount(row_counts + len(file_accounts))
-                for rowIndex, account_info in enumerate(file_accounts):
-                    checkBoxItem = QtWidgets.QTableWidgetItem()
-                    checkBoxItem.setCheckState(QtCore.Qt.Unchecked)
-                    self.accTable.setItem(row_counts + rowIndex, 0, checkBoxItem)
-                    self.accTable.setItem(row_counts + rowIndex, 1, QtWidgets.QTableWidgetItem(account_info['account']))
-                    self.accTable.setItem(row_counts + rowIndex, 2, QtWidgets.QTableWidgetItem(account_info['password']))
+                        file_accounts.append({'account': account, 'password': password})
+                # 录入数据库
+                if file_accounts:
+                    for account_info in file_accounts:
+                        sql_handler.insert_or_update(account_info['account'], account_info['password'], '', '', '',
+                                                     0, '', '', '')
+                sql_handler.conn.close()
+                # 重新加载数据库
+                self.load_accounts_from_db()
 
     def load_accounts_from_db(self):
-        self.sql_handler = SQLHandler()
-        accounts = self.sql_handler.get_all_accounts()
-        self.accTable.setRowCount(len(accounts))
-        for rowIndex, account in enumerate(accounts):
-            checkBoxItem = QtWidgets.QTableWidgetItem()
-            checkBoxItem.setCheckState(QtCore.Qt.Unchecked)
-            self.accTable.setItem(rowIndex, 0, checkBoxItem)
+        global g_accounts
+        sql_handler = SQLHandler()
+        accounts = sql_handler.get_all_accounts()
+        if len(accounts) > 0:
+            g_accounts = accounts
+        self.accTable.setRowCount(len(g_accounts))
+        for rowIndex, account in enumerate(g_accounts):
             for columnIndex, item in enumerate(account):
-                if columnIndex < self.accTable.columnCount() and columnIndex < 2:
-                    self.accTable.setItem(rowIndex, columnIndex + 1, QtWidgets.QTableWidgetItem(item))
-        self.sql_handler.conn.close()
+                if columnIndex < self.accTable.columnCount() and columnIndex < 1:
+                    self.accTable.setItem(rowIndex, columnIndex, QtWidgets.QTableWidgetItem(item))
+        sql_handler.conn.close()
 
     def toggle_task(self):
         if not self.isRunning:
@@ -321,6 +345,8 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             self.stop_task()
 
     def start_task(self):
+        # 清空日志
+        self.msgEdit.clear()
         thread_num = int(self.threadNumEdit.text())  # 获取文本内容
         if thread_num:
             self.maxThreads = thread_num
@@ -334,14 +360,9 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             self.threadList.clear()
             rowCount = self.accTable.rowCount()
             for rowIndex in range(rowCount):
-                account = self.accTable.item(rowIndex, 1).text()
-                password = self.accTable.item(rowIndex, 2).text()
-                email = ''
-                # email = self.accTable.item(rowIndex, 3).text()
-                email_pwd = ''
-                # email_pwd = self.accTable.item(rowIndex, 4).text()
+                account = self.accTable.item(rowIndex, 0).text()
                 # 将任务参数作为元组加入队列
-                self.taskQueue.put((account, password, email, email_pwd, rowIndex))
+                self.taskQueue.put((account, rowIndex))
 
             # 尝试启动初始的一组线程
             for _ in range(min(self.maxThreads, self.taskQueue.qsize())):
@@ -359,9 +380,9 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
 
     def start_next_task(self):
         if not self.taskQueue.empty() and self.activeThreads < self.maxThreads and self.isRunning == 1:
-            account, password, email, email_pwd, rowIndex = self.taskQueue.get()
+            account, rowIndex = self.taskQueue.get()
             thread = QThread()
-            worker = Worker(account, password, email, email_pwd, rowIndex)
+            worker = Worker(account, rowIndex)
             worker.moveToThread(thread)
             worker.update_table_item_request.connect(self.update_table_item)
             worker.get_table_item.connect(self.get_table_item)
@@ -405,81 +426,61 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         menu = QMenu()
 
         # 添加全选动作
-        selectAllAction = menu.addAction("全选")
-        selectAllAction.triggered.connect(self.selectAll)
-
-        # 添加反选动作
-        invertSelectionAction = menu.addAction("反选")
-        invertSelectionAction.triggered.connect(self.invertSelection)
+        selectAllAction = menu.addAction("导出所有账号")
+        selectAllAction.triggered.connect(self.export_all)
 
         # 选中掉落数量大于0的账户
-        invertSelectionAction = menu.addAction("选中掉落数量大于0的账户")
-        invertSelectionAction.triggered.connect(self.select_num_gt_0)
+        invertSelectionAction = menu.addAction("导出本周稀有掉落账户")
+        invertSelectionAction.triggered.connect(self.export_this_week_rare_accounts)
 
         # 选中本周掉落等于0的账户
-        invertSelectionAction = menu.addAction("选中本周未掉落的账户")
-        invertSelectionAction.triggered.connect(self.select_week_drop_eq_0())
+        invertSelectionAction = menu.addAction("导出本周未掉落的账户")
+        invertSelectionAction.triggered.connect(self.export_week_drop_eq_0)
 
-        # 添加删除选中行动作
-        deleteSelectedAction = menu.addAction("删除选中行")
-        deleteSelectedAction.triggered.connect(self.deleteSelectedRows)
-
-        # 导出选中账号
-        deleteSelectedAction = menu.addAction("导出选中账号")
-        deleteSelectedAction.triggered.connect(self.exportSelectedRows)
+        # 导出vac账户
+        deleteSelectedAction = menu.addAction("导出vac账户")
+        deleteSelectedAction.triggered.connect(self.export_vac_accounts)
 
         # 显示菜单
         menu.exec_(self.accTable.viewport().mapToGlobal(position))
 
-    def selectAll(self):
-        for i in range(self.accTable.rowCount()):
-            self.accTable.item(i, 0).setCheckState(Qt.Checked)
+    def export_all(self):
+        # 查询数据库
+        sql_handler = SQLHandler()
+        accounts = sql_handler.get_all_accounts()
+        sql_handler.conn.close()
+        self.export(['账号', '密码'], accounts)
 
-    def select_num_gt_0(self):
-        for i in range(self.accTable.rowCount()):
-            num = self.get_table_item(i, 7)
-            if num and int(num) > 0:
-                self.accTable.item(i, 0).setCheckState(Qt.Checked)
-            else:
-                self.accTable.item(i, 0).setCheckState(Qt.Unchecked)
+    def export_this_week_rare_accounts(self):
+        # 查询数据库
+        sql_handler = SQLHandler()
+        accounts = sql_handler.get_rare_drop_accounts()
+        sql_handler.conn.close()
+        self.export(['账号', '密码', '稀有掉落'], accounts)
 
-    def select_week_drop_eq_0(self):
-        for i in range(self.accTable.rowCount()):
-            is_this_week_drop = self.get_table_item(i, 10)
-            if is_this_week_drop and is_this_week_drop == 'False':
-                self.accTable.item(i, 0).setCheckState(Qt.Checked)
-            else:
-                self.accTable.item(i, 0).setCheckState(Qt.Unchecked)
+    def export_week_drop_eq_0(self):
+        # 查询数据库
+        sql_handler = SQLHandler()
+        accounts = sql_handler.get_week_drop_eq_0()
+        sql_handler.conn.close()
+        self.export(['账号', '密码', '等级', '经验'], accounts)
 
-    def invertSelection(self):
-        for i in range(self.accTable.rowCount()):
-            if self.accTable.item(i, 0).checkState() == Qt.Checked:
-                self.accTable.item(i, 0).setCheckState(Qt.Unchecked)
-            else:
-                self.accTable.item(i, 0).setCheckState(Qt.Checked)
+    def export_vac_accounts(self):
+        # 查询数据库
+        sql_handler = SQLHandler()
+        accounts = sql_handler.get_vac_accounts()
+        sql_handler.conn.close()
+        self.export(['账号', '密码', 'VAC状态'], accounts)
 
-    def deleteSelectedRows(self):
-        # 从后往前遍历，避免索引问题
-        for i in range(self.accTable.rowCount() - 1, -1, -1):
-            if self.accTable.item(i, 0).checkState() == Qt.Checked:
-                self.accTable.removeRow(i)
-
-    def exportSelectedRows(self):
+    def export(self, titles, data=[]):
         # 创建一个工作簿
         workbook = Workbook()
         sheet = workbook.active
-        column_titles = ['账户', '密码', '邮箱', '邮箱密码', '最近掉落', '掉落数量', '掉落日期', '掉落价格']
+        column_titles = titles
         sheet.append(column_titles)  # 将列标题添加到第一行
         # 遍历表格的每一行
-        for i in range(self.accTable.rowCount()):
-            if self.accTable.item(i, 0).checkState() == Qt.Checked:
-                # 如果该行被选中，则将该行的所有列数据添加到工作表中
-                rowData = []
-                for j in range(self.accTable.columnCount()):
-                    item = self.accTable.item(i, j)
-                    if j == 0 or j == 5: continue
-                    rowData.append(item.text() if item else "")
-                sheet.append(rowData)
+        for item in data:
+            sheet.append(item)
         # 弹出文件保存对话框，让用户选择保存位置和文件名
         fileName, _ = QFileDialog.getSaveFileName(None, "保存文件", "", "Excel文件 (*.xlsx)")
 
@@ -487,7 +488,8 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             # 保存工作簿到指定的文件
             workbook.save(fileName)
             # 提示保存成功
-            QMessageBox.information(None, "导出成功", f"账号信息已成功导出到 {fileName}")
+            QMessageBox.information(None, "导出成功", f"已成功导出到 {fileName},共 {len(data)} 条记录")
+
 
 import sys
 
