@@ -2,10 +2,6 @@
 
 ![Static Badge](https://img.shields.io/badge/v3.10.*-blue?style=flat&logo=python&logoColor=white&labelColor=gray)
 
-## background
->在
->[**steam-check-recently-dropped**](https://github.com/Cra2yQi/steam-check-recently-dropped)
->的基础上进行了修改，增加了检查个人信息、VAC状态的功能。
 
 ## install
 
@@ -29,6 +25,7 @@ python win_main.py
 |  检查掉落  |        检查最近掉落的物品、掉落日期         |
 | 检查个人信息 | 检查个人信息（等级、目前经验值、本周挂箱状态）、VAC状态 |
 |  日志输出  |       显示稀有掉落、以及本周未升级账号        |
+|  导出功能  |    右键菜单导出功能(稀有掉落、未升级、VAC)     |
 
 ## todo
 - [ ] 查询API化
@@ -40,3 +37,8 @@ python win_main.py
 - 增加了检查个人信息、VAC状态的功能。
 - 增加sqlite3数据库存储数据，不用每次都请求。
 - 增加日志输出，会显示稀有掉落以及本周未掉落箱子的账号
+- 减少登录次数，防止api限制。
+- 右键菜单新增导出功能
+- 优化了信息显示
+- 调整db结构以及资源路径
+- mac版本编译成功
