@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS user_info(
     is_this_week_drop INTEGER,
     rank INTEGER,
     exp INTEGER,
-    session TEXT
+    session TEXT,
+    shared_secret TEXT
     );
 '''
 
