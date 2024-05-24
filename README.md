@@ -15,7 +15,10 @@ pip install -r requirements.txt
 python win_main.py
 ```
 
-## 预览
+## 使用说明
+
+导入账号格式为`account:password`，一行一个账号，不需要邮箱和邮箱密码。
+maFile放置位置为`./maFiles/{steam_id}.maFile`或者`./maFiles/{account}.maFile`。都可识别。
 
 
 ## feature
@@ -41,4 +44,4 @@ python win_main.py
 - 右键菜单新增导出功能
 - 优化了信息显示
 - 调整db结构以及资源路径
-- mac版本编译成功
+- mac版本编译成功&windows版本编辑成功
