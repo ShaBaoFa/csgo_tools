@@ -36,8 +36,9 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 class SQLHandler:
     def __init__(self, db_name='user_info.db'):
-        db_path = resource_path(db_name)
-        self.conn = sqlite3.connect(db_path)
+        if sys.platform.startswith('darwin'):
+            db_name = resource_path(db_name)
+        self.conn = sqlite3.connect(db_name)
         self.cursor = self.conn.cursor()
         # 如果表不存在则创建表
         self.cursor.execute(user_info_table)
