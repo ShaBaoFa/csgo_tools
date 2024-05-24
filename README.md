@@ -17,8 +17,8 @@ python win_main.py
 
 ## 使用说明
 
-导入账号格式为`account:password`，一行一个账号，不需要邮箱和邮箱密码。
-maFile放置位置为`./maFiles/{steam_id}.maFile`或者`./maFiles/{account}.maFile`。都可识别。
+- 导入账号格式为`account:password`，一行一个账号，不需要邮箱和邮箱密码。
+- maFile放置位置为`./maFiles/{steam_id}.maFile`或者`./maFiles/{account}.maFile`。都可识别。
 
 
 ## feature
