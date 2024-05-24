@@ -136,9 +136,10 @@ class Worker(QThread, QObject):
         # 当前经验
         self.update_table_item_request.emit(self.row_index, 7, f"{user_info[9]}")
 
-        # 将 裂空武器箱,P250 | 沙丘之黄 分成两个
-        drop_items = user_info[4].split(',')
-        self.check_rare_drop(drop_items[0])
+        # 如果是本周的再检查稀有掉落
+        if is_this_week_drop(user_info[3]):
+            drop_items = user_info[4].split(',')
+            self.check_rare_drop(drop_items[0])
 
     def login_task(self, account, password, row_index):
         if self.get_acc_from_db() and self.acc.check_session():
@@ -221,8 +222,6 @@ class Worker(QThread, QObject):
             inventory_list = regex_recently_dropped(inventory_re)
             if inventory_list:
                 if inventory_list[0]['date'] == inventory_list[1]['date']:
-                    # 将 裂空武器箱,P250 | 沙丘之黄 分成两个
-                    self.check_rare_drop(inventory_list[1]['item_name'])
                     self.update_table_item_request.emit(self.row_index, 2,
                                                         f"{inventory_list[1]['item_name']}, {inventory_list[0]['item_name']}")
                     self.update_table_item_request.emit(self.row_index, 3,
@@ -233,7 +232,8 @@ class Worker(QThread, QObject):
                     self.update_table_item_request.emit(self.row_index, 3,
                                                         f"{inventory_list[0]['date']}")
                 # 如果 inventory_list[0]['date'] 小于本周三上午10点，那么就是上周的掉落
-
+                if is_this_week_drop(inventory_list[0]['date']):
+                    self.check_rare_drop(inventory_list[1]['item_name'])
                 self.update_table_item_request.emit(self.row_index, 5,
                                                     f"{is_this_week_drop(inventory_list[0]['date'])}")
                 return True, inventory_list
