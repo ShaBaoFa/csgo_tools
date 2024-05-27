@@ -131,7 +131,6 @@ class Worker(QThread, QObject):
 
     def set_data_from_cache(self):
         user_info = self.sql_handler.get_user_info(self.account)
-        print(user_info)
         #  user_account, drop_item, drop_time, vac_status, is_this_week_drop, rank, exp, map_info
         # 账号
         self.update_table_item_request.emit(self.row_index, 0, f"{user_info[0]}")
