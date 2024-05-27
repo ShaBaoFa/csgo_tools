@@ -12,13 +12,14 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QFileDialog, QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QVBoxLayout, \
     QWidget, QMenu, QMessageBox
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, Qt
+from bs4 import BeautifulSoup
 from openpyxl import Workbook
 
 from sql_handler import SQLHandler
 from steam import SteamAuth
 from sda_code import generator_code
 from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_account_info, is_this_week_drop, \
-    parse_datetime
+    parse_datetime, regex_match_making
 from win_gui import Ui_task_MainWindow, Ui_login_MainWindow
 
 g_accounts = []
@@ -75,24 +76,35 @@ class Worker(QThread, QObject):
                 if login_state:
                     print(f'{self.account}---{self.password}---login_success')
                     inventory_status, inventory_data = self.inventory_task()
-                    step += 1
+                    if not inventory_status:
+                        step += 1
+                        raise Exception(f"{self.account} 未获取到掉落信息")
                     vac_status, vac = self.vac_check_task()
-                    step += 1
+                    if not vac_status:
+                        step += 1
+                        raise Exception(f"{self.account} 未获取到VAC信息")
                     account_info_status, csgo_account = self.csgo_account_info_task()
-                    step += 1
-                    self.save_cache(inventory_data, vac, csgo_account)
+                    if not account_info_status:
+                        step += 1
+                        raise Exception(f"{self.account} 未获取到CSGO账户信息")
+                    match_making_status, map_info = self.get_match_making_task()
+                    if not match_making_status:
+                        step += 1
+                        raise Exception(f"{self.account} 未获取到匹配信息")
+                    self.save_cache(inventory_data=inventory_data, vac=vac, csgo_account=csgo_account, map_info=map_info)
                     step += 1
                     self.sql_handler.conn.close()
+                    self.update_table_item_request.emit(self.row_index, 1, '任务完成')
         except Exception as e:
             print(f"{self.account}在第{step}步出现异常")
             print(f'Exception in run: {e}')
         finally:
             self.finished.emit()
 
-    def save_cache(self, inventory_data, vac, csgo_account):
+    def save_cache(self, inventory_data, vac, csgo_account,map_info):
         if not is_this_week_drop(inventory_data[0]['date']):
             self.log_message.emit(f"{self.account} 本周未掉落")
-        # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
+        # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info)
         self.sql_handler.insert_or_update(self.account,
                                           self.password,
                                           inventory_data[0]['date'],
@@ -101,7 +113,8 @@ class Worker(QThread, QObject):
                                           vac,
                                           is_this_week_drop(inventory_data[0]['date']),
                                           csgo_account['rank'],
-                                          csgo_account['exp'])
+                                          csgo_account['exp'],
+                                          map_info),
 
     def check_rare_drop(self, drop_item):
         if drop_item not in self.normal_boxes:
@@ -118,31 +131,35 @@ class Worker(QThread, QObject):
 
     def set_data_from_cache(self):
         user_info = self.sql_handler.get_user_info(self.account)
-        # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
+        print(user_info)
+        #  user_account, drop_item, drop_time, vac_status, is_this_week_drop, rank, exp, map_info
         # 账号
-        self.update_table_item_request.emit(self.row_index, 0, f"{user_info[1]}")
+        self.update_table_item_request.emit(self.row_index, 0, f"{user_info[0]}")
         # 登录状态
         self.update_table_item_request.emit(self.row_index, 1, '读取缓存')
         # 最近掉落
-        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[4]}")
+        self.update_table_item_request.emit(self.row_index, 2, f"{user_info[1]}")
         # 掉落日期
-        self.update_table_item_request.emit(self.row_index, 3, f"{user_info[3]}")
+        self.update_table_item_request.emit(self.row_index, 3, f"{user_info[2]}")
         # VAC状态
-        self.update_table_item_request.emit(self.row_index, 4, f"{user_info[6]}")
+        self.update_table_item_request.emit(self.row_index, 4, f"{user_info[3]}")
         # 是否是本周掉落
-        self.update_table_item_request.emit(self.row_index, 5, f"{user_info[7]}")
+        self.update_table_item_request.emit(self.row_index, 5, f"{user_info[4]}")
         # 等级
-        self.update_table_item_request.emit(self.row_index, 6, f"{user_info[8]}")
+        self.update_table_item_request.emit(self.row_index, 6, f"{user_info[5]}")
         # 当前经验
-        self.update_table_item_request.emit(self.row_index, 7, f"{user_info[9]}")
+        self.update_table_item_request.emit(self.row_index, 7, f"{user_info[6]}")
+        # 胜场信息
+        self.update_table_item_request.emit(self.row_index, 8, f"Vertigo | {user_info[7]}")
 
         # 如果是本周的再检查稀有掉落
-        if is_this_week_drop(user_info[3]):
-            drop_items = user_info[4].split(',')
+        if is_this_week_drop(user_info[2]):
+            drop_items = user_info[1].split(',')
             self.check_rare_drop(drop_items[0])
 
     def login_task(self, account, password, row_index):
         if self.get_acc_from_db() and self.acc.check_session():
+            print('使用db中的session登录')
             self.update_table_item_request.emit(row_index, 1, '登录成功')
             return True
         self.acc = SteamAuth(account, password)
@@ -157,7 +174,7 @@ class Worker(QThread, QObject):
             # 休息1秒
             time.sleep(1)
             if send_state:
-                print('获取验证码...')
+                print(f'{self.account}获取验证码...')
                 if len(send_re.allowed_confirmations) > 0:
                     if send_re.allowed_confirmations[0].confirmation_type == 2:
                         print('尝试获取邮箱令牌')
@@ -174,6 +191,7 @@ class Worker(QThread, QObject):
                             if state:
                                 token_state = self.acc.get_token()
                                 if token_state:
+                                    print('setting_acc...')
                                     self.set_acc()
                                     self.update_table_item_request.emit(row_index, 1, '登录成功')
                                     return True
@@ -190,6 +208,19 @@ class Worker(QThread, QObject):
         else:
             self.update_table_item_request.emit(row_index, 1, '获取密钥失败')
             return False
+
+
+    def get_match_making_task(self):
+        self.update_table_item_request.emit(self.row_index, 1, '正在获取匹配信息...')
+        state, match_making_re = self.acc.get_match_making()
+        if state:
+            self.update_table_item_request.emit(self.row_index, 1, '获取匹配信息成功')
+            map_name = 'Vertigo'
+            wins = regex_match_making(match_making_re, map_name=map_name)
+            self.update_table_item_request.emit(self.row_index, 8, f"{map_name} | {wins}")
+            return True, wins
+        self.update_table_item_request.emit(self.row_index, 1, '获取匹配信息失败')
+        return False, None
 
     def csgo_account_info_task(self):
         self.update_table_item_request.emit(self.row_index, 1, '正在获取CSGO账户信息...')
@@ -238,6 +269,8 @@ class Worker(QThread, QObject):
                                                     f"{is_this_week_drop(inventory_list[0]['date'])}")
                 return True, inventory_list
             else:
+                soup = BeautifulSoup(inventory_re, 'html.parser')
+                print(f'{soup}')
                 self.update_table_item_request.emit(self.row_index, 2, '未掉落')
                 return False, None
         self.update_table_item_request.emit(self.row_index, 1, '获取掉落信息失败')
@@ -320,7 +353,7 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
                 if file_accounts:
                     for account_info in file_accounts:
                         sql_handler.insert_or_update(account_info['account'], account_info['password'], '', '', '',
-                                                     0, '', '', '')
+                                                     0, '', '', '',0)
                 sql_handler.conn.close()
                 # 重新加载数据库
                 self.load_accounts_from_db()

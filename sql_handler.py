@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS user_info(
     rank INTEGER,
     exp INTEGER,
     session TEXT,
-    shared_secret TEXT
+    shared_secret TEXT,
+    map_info INTEGER DEFAULT 0
     );
 '''
 
@@ -57,7 +58,7 @@ class SQLHandler:
 
     def get_user_info(self, user_account):
         self.cursor.execute(
-            'SELECT * FROM user_info WHERE user_account = ?',
+            'SELECT user_account, drop_item, drop_time, vac_status, is_this_week_drop, rank, exp, map_info FROM user_info WHERE user_account = ?',
             (user_account,)
         )
         result = self.cursor.fetchone()
@@ -67,18 +68,21 @@ class SQLHandler:
 
     def insert_or_update(self, user_account, user_password, drop_time, drop_item, drop_num, vac_status,
                          is_this_week_drop, rank,
-                         exp):
+                         exp, map_info):
         # 判断是否存在
         if self.get_user_info(user_account):
+            print(f'{user_account} update')
             self.cursor.execute(
-                'UPDATE user_info SET user_password = ?, drop_time = ?, drop_item = ?, drop_num = ?, vac_status = ?, is_this_week_drop = ?, rank = ?, exp = ? WHERE user_account = ?',
-                (user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, user_account)
+                'UPDATE user_info SET user_password = ?, drop_time = ?, drop_item = ?, drop_num = ?, vac_status = ?,'
+                'is_this_week_drop = ?, rank = ?, exp = ?, map_info = ? WHERE user_account = ?',
+                (user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info, user_account)
             )
-
         else:
+            print(f'{user_account} insert')
             self.cursor.execute(
-                'INSERT INTO user_info(user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp)
+                'INSERT INTO user_info(user_account, user_password, drop_time, drop_item, drop_num, vac_status,'
+                'is_this_week_drop, rank, exp, map_info) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info)
             )
         self.conn.commit()
 
@@ -91,11 +95,13 @@ class SQLHandler:
 
     def set_account_session(self, user_account, session):
         if self.get_user_info(user_account):
+            print(f'{user_account} session update')
             self.cursor.execute(
                 'UPDATE user_info SET session = ? WHERE user_account = ?',
                 (session, user_account)
             )
         else:
+            print(f'{user_account} session insert')
             self.cursor.execute(
                 'INSERT INTO user_info(user_account, session) VALUES(?, ?)',
                 (user_account, session)

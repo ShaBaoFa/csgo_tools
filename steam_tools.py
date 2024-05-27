@@ -7,6 +7,14 @@ from bs4 import BeautifulSoup
 正则最近掉落记录
 '''
 
+def regex_seesion_check(text):
+    soup = BeautifulSoup(text, 'html.parser')
+    # 找到 youraccount_steamid
+    youraccount_steamid = soup.find("div", class_="youraccount_steamid")
+    if youraccount_steamid:
+        return True
+    else:
+        return False
 
 def regex_recently_dropped(text, num=2):
     inventory_list = []
@@ -59,6 +67,21 @@ def regex_vac_status(text):
         vac_mes = '未知'
     return vac, vac_mes
 
+
+def regex_match_making(text, map_name='Vertigo'):
+    soup = BeautifulSoup(text, 'html.parser')
+    # 正则表达式模式，使用format方法将地图名插入到正则表达式中
+    pattern = re.compile(
+        r'<tr>\s*<td>竞技模式</td>\s*<td>{}</td>\s*<td>(\d+)</td>\s*<td>(\d+)</td>\s*<td>(\d+)</td>\s*<td>([^<]*)</td>\s*<td>([^<]+)</td>\s*<td>(\d+)</td>\s*</tr>'.format(re.escape(map_name))
+    )
+
+    # 使用正则表达式查找匹配的内容
+    matches = pattern.findall(str(soup))
+    if not matches:
+        return None
+    # 返回匹配到胜利次数
+    print(matches[0])
+    return int(matches[0][0])
 
 def regex_csgo_account_info(text):
     account_info = []

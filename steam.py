@@ -20,6 +20,8 @@ from steam_pb2 import (
 )
 import urllib3
 
+from steam_tools import regex_seesion_check
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -310,6 +312,38 @@ class SteamAuth:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)
 
+    def get_match_making(self):
+        url = f'https://steamcommunity.com/profiles/{self.steam_id}/gcpd/730/?tab=matchmaking'
+        cookies = {
+            'sessionid': str(self.session_id),
+            'steamid': str(self.steam_id),
+            'steamLoginSecure': f'{self.steam_id}%7C%7C{self.access_token}',
+            'steamRefresh_steam': f'{self.steam_id}%7C%7C{self.refresh_token}',
+            'browserid': str(self.browser_id),
+            'timezoneOffset': '28800,0',
+            'steamCountry': 'CN%7C65c6e647746973917498bae6bced5fb9'
+        }
+        headers = {
+            'user-agent': self.ua,
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        attempt = 0
+        max_attempts = 5
+        while attempt < max_attempts:
+            try:
+                response = requests.get(url, headers=headers, cookies=cookies, timeout=5)
+                if response.status_code == 200:
+                    return True, response.content
+                elif response.status_code == 302:
+                    return False, {"msg": "logout"}
+                else:
+                    return False, "网络状态返回错误"
+            except RequestException as e:
+                attempt += 1
+                logging.error(f"Function : get_rsa_public_key ,Attempt {attempt} failed with exception: {e}")
+                if attempt == max_attempts:
+                    # 最后一次尝试失败，返回False和异常信息
+                    return False, str(e)
     def get_vac_status(self):
         url = f'https://help.steampowered.com/en/wizard/VacBans/'
         cookies = {
@@ -364,7 +398,7 @@ class SteamAuth:
             try:
                 response = requests.get(url, headers=headers, cookies=cookies, timeout=5)
                 if response.status_code == 200:
-                    return True
+                    return regex_seesion_check(response.content)
                 elif response.status_code == 302:
                     return False
                 else:

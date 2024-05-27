@@ -97,7 +97,7 @@ class Ui_task_MainWindow(object):
         self.accTable.setGeometry(QtCore.QRect(0, 0, 711, 401))
         self.accTable.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.accTable.setObjectName("accTable")
-        self.accTable.setColumnCount(8)
+        self.accTable.setColumnCount(9)
 
         self.accTable.setRowCount(0)
         item = QtWidgets.QTableWidgetItem()
@@ -116,6 +116,8 @@ class Ui_task_MainWindow(object):
         self.accTable.setHorizontalHeaderItem(6, item)
         item = QtWidgets.QTableWidgetItem()
         self.accTable.setHorizontalHeaderItem(7, item)
+        item = QtWidgets.QTableWidgetItem()
+        self.accTable.setHorizontalHeaderItem(8, item)
         self.accTable.horizontalHeader().setCascadingSectionResizes(False)
         self.accTable.horizontalHeader().setDefaultSectionSize(85)
         self.accTable.horizontalHeader().setSortIndicatorShown(False)
@@ -129,6 +131,7 @@ class Ui_task_MainWindow(object):
         self.accTable.setColumnWidth(5, 100)  # 本周已挂
         self.accTable.setColumnWidth(6, 100)  # 等级
         self.accTable.setColumnWidth(7, 100)  # 经验
+        self.accTable.setColumnWidth(8, 100)  # 胜场
         self.fuctionGroup = QtWidgets.QGroupBox(self.centralwidget)
         self.fuctionGroup.setGeometry(QtCore.QRect(720, 0, 201, 401))
         self.fuctionGroup.setObjectName("fuctionGroup")
@@ -187,6 +190,8 @@ class Ui_task_MainWindow(object):
         item.setText(_translate("MainWindow", "等级"))
         item = self.accTable.horizontalHeaderItem(7)
         item.setText(_translate("MainWindow", "当前经验"))
+        item = self.accTable.horizontalHeaderItem(8)
+        item.setText(_translate("MainWindow", "胜场信息"))
         self.fuctionGroup.setTitle(_translate("MainWindow", "功能区"))
         self.addAccBut.setText(_translate("MainWindow", "导入账号"))
         self.startTaskBut.setText(_translate("MainWindow", "开始"))
