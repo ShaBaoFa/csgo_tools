@@ -19,7 +19,7 @@ from sql_handler import SQLHandler
 from steam import SteamAuth
 from sda_code import generator_code
 from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_account_info, is_this_week_drop, \
-    parse_datetime, regex_match_making
+    parse_datetime, regex_match_making, regex_account_balance
 from win_gui import Ui_task_MainWindow, Ui_login_MainWindow
 
 g_accounts = []
@@ -91,7 +91,11 @@ class Worker(QThread, QObject):
                     if not match_making_status:
                         step += 1
                         raise Exception(f"{self.account} 未获取到匹配信息")
-                    self.save_cache(inventory_data=inventory_data, vac=vac, csgo_account=csgo_account, map_info=map_info)
+                    status, country, balance = self.account_balance_task()
+                    if not status:
+                        step += 1
+                        raise Exception(f"{self.account} 未获取余额信息")
+                    self.save_cache(inventory_data=inventory_data, vac=vac, csgo_account=csgo_account, map_info=map_info,country=country,balance=balance)
                     step += 1
                     self.sql_handler.conn.close()
                     self.update_table_item_request.emit(self.row_index, 1, '任务完成')
@@ -101,7 +105,7 @@ class Worker(QThread, QObject):
         finally:
             self.finished.emit()
 
-    def save_cache(self, inventory_data, vac, csgo_account,map_info):
+    def save_cache(self, inventory_data, vac, csgo_account,map_info,country,balance):
         if not is_this_week_drop(inventory_data[0]['date']):
             self.log_message.emit(f"{self.account} 本周未掉落")
         # user_info 格式 (id, user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info)
@@ -114,7 +118,9 @@ class Worker(QThread, QObject):
                                           is_this_week_drop(inventory_data[0]['date']),
                                           csgo_account['rank'],
                                           csgo_account['exp'],
-                                          map_info),
+                                          map_info,
+                                          country,
+                                          balance),
 
     def check_rare_drop(self, drop_item):
         if drop_item not in self.normal_boxes:
@@ -150,7 +156,10 @@ class Worker(QThread, QObject):
         self.update_table_item_request.emit(self.row_index, 7, f"{user_info[6]}")
         # 胜场信息
         self.update_table_item_request.emit(self.row_index, 8, f"Vertigo | {user_info[7]}")
-
+        # 国家
+        self.update_table_item_request.emit(self.row_index, 9, f"{user_info[8]}")
+        # 余额
+        self.update_table_item_request.emit(self.row_index, 10, f"{user_info[9]}")
         # 如果是本周的再检查稀有掉落
         if is_this_week_drop(user_info[2]):
             drop_items = user_info[1].split(',')
@@ -242,6 +251,18 @@ class Worker(QThread, QObject):
             self.update_table_item_request.emit(self.row_index, 4, f"{vac},{vac_mes}")
             return True, vac
         self.update_table_item_request.emit(self.row_index, 1, '获取VAC状态失败')
+        return False, None
+
+    def account_balance_task(self):
+        self.update_table_item_request.emit(self.row_index, 1, '正在获取余额状态...')
+        state, account_info = self.acc.get_account_info()
+        if state:
+            self.update_table_item_request.emit(self.row_index, 1, '获取余额数据成功')
+            country_region, balance = regex_account_balance(account_info)
+            self.update_table_item_request.emit(self.row_index, 9, f"{country_region}")
+            self.update_table_item_request.emit(self.row_index, 10, f"{balance}")
+            return True, country_region, balance
+        self.update_table_item_request.emit(self.row_index, 1, '获取余额数据失败')
         return False, None
 
     def inventory_task(self):
@@ -352,7 +373,7 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
                 if file_accounts:
                     for account_info in file_accounts:
                         sql_handler.insert_or_update(account_info['account'], account_info['password'], '', '', '',
-                                                     0, '', '', '',0)
+                                                     0, '', '', '',0,'',0)
                 sql_handler.conn.close()
                 # 重新加载数据库
                 self.load_accounts_from_db()

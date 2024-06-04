@@ -44,6 +44,31 @@ def regex_recently_dropped(text, num=2):
         })
     return inventory_list
 
+def regex_account_balance(text):
+    soup = BeautifulSoup(text, 'html.parser')
+
+    # 提取国家/地区信息
+    country_tag = soup.find('span', class_='account_data_field')
+    if country_tag:
+        country_region = country_tag.text.strip()
+        print(f"国家/地区: {country_region}")
+    else:
+        country_region = '未知'
+        print("未找到国家/地区信息")
+# 提取余额数量
+    balance_div = soup.find('div', class_='accountData price')
+    if balance_div:
+        print(f'{balance_div}')
+        balance = balance_div.text.strip()
+        balance_number = re.search(r'[\d\.]+', balance).group()
+        print(f"余额数量: {balance_number}")
+    else:
+        balance_number = 0
+        print("未找到余额信息的div标签")
+
+    print(f'{country_region} | {balance_number}')
+    return country_region, balance_number
+
 
 '''
 正则csgo信息
@@ -54,7 +79,7 @@ def regex_vac_status(text):
     soup = BeautifulSoup(text, 'html.parser')
     # 找到vac状态
     vac_status = soup.find("div", class_="no_vac_bans_header")
-    ban_vac_status = soup.find("div", class_="no_vac_bans_header")
+    ban_vac_status = soup.find("div", class_="vac_ban_header")
     # 如果存在,则vac为0
     if vac_status:
         vac = 0

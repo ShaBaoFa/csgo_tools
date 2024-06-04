@@ -207,7 +207,7 @@ class SteamAuth:
                     return False
             except RequestException as e:
                 attempt += 1
-                logging.error(f"Function : send_encode_request ,Attempt {attempt} failed with exception: {e}")
+                logging.error(f"Function : auth_code ,Attempt {attempt} failed with exception: {e}")
                 if attempt == max_attempts:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)
@@ -241,7 +241,7 @@ class SteamAuth:
                 return False
             except RequestException as e:
                 attempt += 1
-                logging.error(f"Function : get_rsa_public_key ,Attempt {attempt} failed with exception: {e}")
+                logging.error(f"Function : get_token ,Attempt {attempt} failed with exception: {e}")
                 if attempt == max_attempts:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)
@@ -344,6 +344,7 @@ class SteamAuth:
                 if attempt == max_attempts:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)
+
     def get_vac_status(self):
         url = f'https://help.steampowered.com/en/wizard/VacBans/'
         cookies = {
@@ -406,6 +407,39 @@ class SteamAuth:
             except RequestException as e:
                 attempt += 1
                 logging.error(f"Function : check_session ,Attempt {attempt} failed with exception: {e}")
+                if attempt == max_attempts:
+                    # 最后一次尝试失败，返回False和异常信息
+                    return False, str(e)
+
+    def get_account_info(self):
+        url = 'https://store.steampowered.com/account/'
+        cookies = {
+            'sessionid': str(self.session_id),
+            'steamid': str(self.steam_id),
+            'steamLoginSecure': f'{self.steam_id}%7C%7C{self.access_token}',
+            'steamRefresh_steam': f'{self.steam_id}%7C%7C{self.refresh_token}',
+            'browserid': str(self.browser_id),
+            'timezoneOffset': '28800,0',
+            'steamCountry': 'CN%7C65c6e647746973917498bae6bced5fb9'
+        }
+        headers = {
+            'user-agent': self.ua,
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        attempt = 0
+        max_attempts = 5
+        while attempt < max_attempts:
+            try:
+                response = requests.get(url, headers=headers, cookies=cookies, timeout=5)
+                if response.status_code == 200:
+                    return True, response.content
+                elif response.status_code == 302:
+                    return False
+                else:
+                    return False, "网络状态返回错误"
+            except RequestException as e:
+                attempt += 1
+                logging.error(f"Function : get_account_info ,Attempt {attempt} failed with exception: {e}")
                 if attempt == max_attempts:
                     # 最后一次尝试失败，返回False和异常信息
                     return False, str(e)

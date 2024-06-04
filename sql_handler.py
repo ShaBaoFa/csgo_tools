@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS user_info(
     exp INTEGER,
     session TEXT,
     shared_secret TEXT,
-    map_info INTEGER DEFAULT 0
+    map_info INTEGER DEFAULT 0,
+    country TEXT,
+    balance INTEGER DEFAULT 0
     );
 '''
 
@@ -68,21 +70,21 @@ class SQLHandler:
 
     def insert_or_update(self, user_account, user_password, drop_time, drop_item, drop_num, vac_status,
                          is_this_week_drop, rank,
-                         exp, map_info):
+                         exp, map_info,country,balance):
         # 判断是否存在
         if self.get_user_info(user_account):
             print(f'{user_account} update')
             self.cursor.execute(
                 'UPDATE user_info SET user_password = ?, drop_time = ?, drop_item = ?, drop_num = ?, vac_status = ?,'
-                'is_this_week_drop = ?, rank = ?, exp = ?, map_info = ? WHERE user_account = ?',
-                (user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info, user_account)
+                'is_this_week_drop = ?, rank = ?, exp = ?, map_info = ?,country = ?,balance = ? WHERE user_account = ?',
+                (user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info,country,balance, user_account)
             )
         else:
             print(f'{user_account} insert')
             self.cursor.execute(
                 'INSERT INTO user_info(user_account, user_password, drop_time, drop_item, drop_num, vac_status,'
-                'is_this_week_drop, rank, exp, map_info) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                (user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info)
+                'is_this_week_drop, rank, exp, map_info,country,balance) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?)',
+                (user_account, user_password, drop_time, drop_item, drop_num, vac_status, is_this_week_drop, rank, exp, map_info,country,balance)
             )
         self.conn.commit()
 
