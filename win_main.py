@@ -23,7 +23,13 @@ from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_acc
 from win_gui import Ui_task_MainWindow, Ui_login_MainWindow
 
 g_accounts = []
-
+data_count = {
+    '梦魇武器箱': 0,
+    '千瓦武器箱': 0,
+    '反冲武器箱': 0,
+    '变革武器箱': 0,
+    '裂空武器箱': 0,
+}
 class Worker(QThread, QObject):
     finished = pyqtSignal()
     update_table_item_request = pyqtSignal(int, int, str)
@@ -127,6 +133,11 @@ class Worker(QThread, QObject):
             self.log_message.emit(f"恭喜! {self.account} 检测到稀有掉落: {drop_item}")
         pass
 
+    # 统计本周掉落
+    def count_this_week_drop(self, drop_item):
+        data_count[drop_item] += 1
+        pass
+
     def check_cache(self):
         drop_time = self.sql_handler.get_drop_time(self.account)
         if not drop_time:
@@ -164,6 +175,7 @@ class Worker(QThread, QObject):
         if is_this_week_drop(user_info[2]):
             drop_items = user_info[1].split(',')
             self.check_rare_drop(drop_items[0])
+            self.count_this_week_drop(drop_items[0])
 
     def login_task(self, account, password, row_index):
         if self.get_acc_from_db() and self.acc.check_session():
@@ -285,6 +297,7 @@ class Worker(QThread, QObject):
                 # 如果 inventory_list[0]['date'] 小于本周三上午10点，那么就是上周的掉落
                 if is_this_week_drop(inventory_list[0]['date']):
                     self.check_rare_drop(inventory_list[1]['item_name'])
+                    self.count_this_week_drop(inventory_list[1]['item_name'])
                 self.update_table_item_request.emit(self.row_index, 5,
                                                     f"{is_this_week_drop(inventory_list[0]['date'])}")
                 return True, inventory_list
@@ -467,6 +480,18 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
 
         # 检查是否所有任务都已完成
         if self.taskQueue.empty() and self.activeThreads == 0:
+            # 显示统计数据
+            self.msgEdit.append(f"梦魇武器箱: {data_count['梦魇武器箱']} ")
+            self.msgEdit.append(f"千瓦武器箱: {data_count['千瓦武器箱']} ")
+            self.msgEdit.append(f"反冲武器箱: {data_count['反冲武器箱']} ")
+            self.msgEdit.append(f"变革武器箱: {data_count['变革武器箱']} ")
+            self.msgEdit.append(f"裂空武器箱: {data_count['裂空武器箱']} ")
+            # 重制data_count数据
+            data_count['梦魇武器箱'] = 0
+            data_count['千瓦武器箱'] = 0
+            data_count['反冲武器箱'] = 0
+            data_count['变革武器箱'] = 0
+            data_count['裂空武器箱'] = 0
             # 所有任务完成后的操作
             QMessageBox.information(None, "任务完成", "所有任务已经完成！")
             self.startTaskBut.setText("开始")

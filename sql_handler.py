@@ -60,7 +60,7 @@ class SQLHandler:
 
     def get_user_info(self, user_account):
         self.cursor.execute(
-            'SELECT user_account, drop_item, drop_time, vac_status, is_this_week_drop, rank, exp, map_info FROM user_info WHERE user_account = ?',
+            'SELECT user_account, drop_item, drop_time, vac_status, is_this_week_drop, rank, exp, map_info,country,balance FROM user_info WHERE user_account = ?',
             (user_account,)
         )
         result = self.cursor.fetchone()
