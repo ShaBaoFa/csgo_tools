@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
+from collections import defaultdict
 # Form implementation generated from reading ui file 'gui.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.9
@@ -23,13 +24,8 @@ from steam_tools import regex_recently_dropped, regex_vac_status, regex_csgo_acc
 from win_gui import Ui_task_MainWindow, Ui_login_MainWindow
 
 g_accounts = []
-data_count = {
-    '梦魇武器箱': 0,
-    '千瓦武器箱': 0,
-    '反冲武器箱': 0,
-    '变革武器箱': 0,
-    '裂空武器箱': 0,
-}
+data_count = {}
+
 class Worker(QThread, QObject):
     finished = pyqtSignal()
     update_table_item_request = pyqtSignal(int, int, str)
@@ -135,6 +131,8 @@ class Worker(QThread, QObject):
 
     # 统计本周掉落
     def count_this_week_drop(self, drop_item):
+        if drop_item not in data_count:
+            data_count[drop_item] = 0
         data_count[drop_item] += 1
         pass
 
@@ -412,6 +410,9 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
             self.stop_task()
 
     def start_task(self):
+        # 清空统计
+        global data_count
+        data_count = {}
         # 清空日志
         self.msgEdit.clear()
         thread_num = int(self.threadNumEdit.text())  # 获取文本内容
@@ -481,17 +482,8 @@ class Ui_MainWindow(QMainWindow, Ui_task_MainWindow):
         # 检查是否所有任务都已完成
         if self.taskQueue.empty() and self.activeThreads == 0:
             # 显示统计数据
-            self.msgEdit.append(f"梦魇武器箱: {data_count['梦魇武器箱']} ")
-            self.msgEdit.append(f"千瓦武器箱: {data_count['千瓦武器箱']} ")
-            self.msgEdit.append(f"反冲武器箱: {data_count['反冲武器箱']} ")
-            self.msgEdit.append(f"变革武器箱: {data_count['变革武器箱']} ")
-            self.msgEdit.append(f"裂空武器箱: {data_count['裂空武器箱']} ")
-            # 重制data_count数据
-            data_count['梦魇武器箱'] = 0
-            data_count['千瓦武器箱'] = 0
-            data_count['反冲武器箱'] = 0
-            data_count['变革武器箱'] = 0
-            data_count['裂空武器箱'] = 0
+            for item in data_count.items():
+                self.msgEdit.append(f"{item[0]}: {item[1]} ")
             # 所有任务完成后的操作
             QMessageBox.information(None, "任务完成", "所有任务已经完成！")
             self.startTaskBut.setText("开始")
